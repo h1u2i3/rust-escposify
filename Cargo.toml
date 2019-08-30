@@ -13,6 +13,7 @@ authors = ["Qian Linfeng <thewawar@gmail.com>"]
 qrcode_builder = ["qrcode"]
 
 [dependencies]
+libusb = "0.3.0"
 encoding = "0.2"
 byteorder = "1.0"
 image = "0.14"
