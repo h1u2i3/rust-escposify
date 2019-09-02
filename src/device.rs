@@ -16,10 +16,10 @@ struct Endpoint {
 }
 
 pub struct Usb<'a> {
-    _vendor_id: u16,
-    _product_id: u16,
-    device_handle: libusb::DeviceHandle<'a>,
-    write_endpoint: Endpoint,
+    _vendor_id: Option<u16>,
+    _product_id: Option<u16>,
+    device_handle: Option<libusb::DeviceHandle<'a>>,
+    write_endpoint: Option<Endpoint>,
     stream: Vec<u8>
 }
 
@@ -101,20 +101,28 @@ fn configure_endpoint(handle: &mut libusb::DeviceHandle, endpoint: &Endpoint) ->
 }
 
 impl<'a> Usb<'a> {
-    pub fn new(context: &'a mut libusb::Context, vendor_id: u16, product_id: u16) -> Usb<'a> {
+    pub fn new(context: &'a mut libusb::Context) -> Usb<'a> {
         let empty_stream : Vec<u8> = Vec::new();
+
         match find_print_endpoint(context) {
             Some((endpoint, vendor_id, product_id)) => {
               let device_handle = context.open_device_with_vid_pid(vendor_id, product_id).unwrap();
               return Usb {
-                  _vendor_id: vendor_id,
-                  _product_id: product_id,
-                  device_handle: device_handle,
-                  write_endpoint: endpoint,
+                  _vendor_id: Some(vendor_id),
+                  _product_id: Some(product_id),
+                  device_handle: Some(device_handle),
+                  write_endpoint: Some(endpoint),
                   stream: empty_stream
               }
             },
-            None => panic!("can't find print endpoint with device {:04x}:{:04x}", vendor_id, product_id)
+            None =>
+              return Usb {
+                  _vendor_id: None,
+                  _product_id: None,
+                  device_handle: None,
+                  write_endpoint: None,
+                  stream: empty_stream
+              }
         }
     }
 }
@@ -126,31 +134,47 @@ impl<'a> io::Write for Usb<'a> {
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        let _ = self.device_handle.reset().unwrap();
-
-        let handle = &mut self.device_handle;
-        let endpoint = &self.write_endpoint;
         let empty_stream : Vec<u8> = Vec::new();
+        let device_handle = &mut self.device_handle;
+        let write_endpoint = &mut self.write_endpoint;
 
-        match configure_endpoint(handle, endpoint) {
-            Ok(_) => {
-                match handle.write_bulk(endpoint.address, &self.stream.as_slice(), Duration::from_secs(10)) {
-                    Ok(n) => {
-                      println!("already write {} bytes!", n);
-                      self.stream = empty_stream;
-                      Ok(())
+        match device_handle {
+            Some(handle) => {
+                handle.reset().unwrap();
+
+                match write_endpoint {
+                    Some(endpoint) => match configure_endpoint(handle, endpoint) {
+                        Ok(_) => {
+                            match handle.write_bulk(endpoint.address, &self.stream.as_slice(), Duration::from_secs(10)) {
+                                Ok(n) => {
+                                  println!("already write {} bytes!", n);
+                                  self.stream = empty_stream;
+                                  Ok(())
+                                },
+                                Err(err) => {
+                                  println!("error happened! {:?}", err);
+                                  self.stream = empty_stream;
+                                  Err(std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))
+                                }
+                            }
+                        },
+                        Err(err) => {
+                            println!("error happened! {:?}", err);
+                            self.stream = empty_stream;
+                            Err(std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))
+                        }
                     },
-                    Err(err) => {
-                      println!("error happened! {:?}", err);
-                      self.stream = empty_stream;
-                      Err(std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))
+                    None => {
+                        println!("didn't find a printer to do print jobs");
+                        self.stream = empty_stream;
+                        Ok(())
                     }
                 }
             },
-            Err(err) => {
-                println!("error happened! {:?}", err);
+            None => {
+                println!("didn't find a printer to do print jobs");
                 self.stream = empty_stream;
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))
+                Ok(())
             }
         }
     }
