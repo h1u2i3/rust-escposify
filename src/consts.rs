@@ -58,6 +58,7 @@ pub const PAPER_CUT_B: &[u8] = b"\x1d\x56\x42"; // Partial cut paper
 pub const TXT_NORMAL: &[u8] = b"\x1b\x21\x00"; // Normal text
 pub const TXT_2HEIGHT: &[u8] = b"\x1b\x21\x10"; // Double height text
 pub const TXT_2WIDTH: &[u8] = b"\x1b\x21\x20"; // Double width text
+pub const TXT_4SQUARE: &[u8] = b"\x1b\x21\x30"; // Double width & height text
 
 pub const TXT_UNDERL_OFF: &[u8] = b"\x1b\x2d\x00"; // Underline font OFF
 pub const TXT_UNDERL_ON: &[u8] = b"\x1b\x2d\x01"; // Underline font 1-dot ON

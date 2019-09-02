@@ -196,12 +196,26 @@ impl<W: io::Write> Printer<W> {
         self.size(width, height).map(|_| self)
     }
     pub fn size(&mut self, width: usize, height: usize) -> io::Result<usize> {
-        let mut n = self.write(consts::TXT_NORMAL)?;
-        if width == 2 {
-            n += self.write(consts::TXT_2WIDTH)?;
-        }
-        if height == 2 {
-            n += self.write(consts::TXT_2HEIGHT)?;
+        let mut n;
+        if width <= 2 && height <= 2 {
+            n = self.write(consts::TXT_NORMAL)?;
+            if width == 2 && height == 2 {
+                n += self.write(consts::TXT_4SQUARE)?;
+            } else if width == 1 && height == 2 {
+                n += self.write(consts::TXT_2HEIGHT)?;
+            } else if height == 1 && width == 2 {
+                n += self.write(consts::TXT_2WIDTH)?;
+            }
+        } else {
+            let width_dec = (width - 1) * 16;
+            let height_dec = height - 1;
+            let size_dec = width_dec + height_dec;
+
+            let bytes : &mut [u8; 3] = &mut [0, 0, 0];
+            bytes[0] = 0x1b;
+            bytes[1] = 0x21;
+            bytes[2] = size_dec as u8;
+            n = self.write(bytes)?;
         }
         Ok(n)
     }
@@ -408,6 +422,7 @@ impl<W: io::Write> Printer<W> {
         n_bytes += self.write_u16le(((image.width + 7) / 8) as u16)?;
         n_bytes += self.write_u16le(image.height as u16)?;
         n_bytes += self.write(image.get_raster().as_ref())?;
+        n_bytes += self.feed(1)?;
         Ok(n_bytes)
     }
 }
